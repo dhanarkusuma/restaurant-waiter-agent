@@ -245,15 +245,28 @@ class ApiClient {
     });
   }
 
-  // Menu
+  // Menu & Categories
   async listCategories() {
-    return this.request<MenuCategory[]>('/admin/menu/categories');
+    return this.request<MenuCategory[]>('/admin/categories');
   }
 
   async createCategory(name: string, description?: string) {
-    return this.request<MenuCategory>('/admin/menu/categories', {
+    return this.request<MenuCategory>('/admin/categories', {
       method: 'POST',
       body: JSON.stringify({ name, description }),
+    });
+  }
+
+  async updateCategory(id: number, name: string, description?: string) {
+    return this.request<MenuCategory>(`/admin/categories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name, description }),
+    });
+  }
+
+  async deleteCategory(id: number) {
+    return this.request<{ id: number; action: string }>(`/admin/categories/${id}`, {
+      method: 'DELETE',
     });
   }
 

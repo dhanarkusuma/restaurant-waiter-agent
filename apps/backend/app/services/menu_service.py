@@ -1,6 +1,11 @@
 from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from apps.backend.app.exceptions import (
+    CategoryAlreadyExistsError,
+    CategoryInUseError,
+    CategoryNotFoundError,
+)
 from apps.backend.app.models import MenuItem
 from apps.backend.app.repositories.menu_repository import MenuRepository
 
@@ -71,6 +76,16 @@ class MenuService:
             for cat in categories
         ]
 
+    async def get_category_by_id(self, category_id: int) -> dict[str, Any] | None:
+        cat = await self.menu_repo.get_category_by_id(category_id)
+        if not cat:
+            return None
+        return {
+            "id": cat.id,
+            "name": cat.name,
+            "description": cat.description,
+        }
+
     # --- Admin Operations ---
 
     async def list_all_admin(self, category_id: int | None = None) -> list[dict[str, Any]]:
@@ -91,8 +106,42 @@ class MenuService:
         ]
 
     async def create_category(self, name: str, description: str | None = None) -> dict[str, Any]:
-        cat = await self.menu_repo.create_category(name=name, description=description)
+        clean_name = name.strip() if name else ""
+        if not clean_name:
+            raise ValueError("Nama kategori tidak boleh kosong.")
+        existing = await self.menu_repo.get_category_by_name(clean_name)
+        if existing:
+            raise CategoryAlreadyExistsError(f"Kategori dengan nama '{clean_name}' sudah ada.")
+        cat = await self.menu_repo.create_category(name=clean_name, description=description)
         return {"id": cat.id, "name": cat.name, "description": cat.description}
+
+    async def update_category(
+        self,
+        category_id: int,
+        name: str,
+        description: str | None = None,
+    ) -> dict[str, Any]:
+        cat = await self.menu_repo.get_category_by_id(category_id)
+        if not cat:
+            raise CategoryNotFoundError(f"Kategori dengan ID {category_id} tidak ditemukan.")
+        clean_name = name.strip() if name else ""
+        if not clean_name:
+            raise ValueError("Nama kategori tidak boleh kosong.")
+        existing = await self.menu_repo.get_category_by_name(clean_name)
+        if existing and existing.id != category_id:
+            raise CategoryAlreadyExistsError(f"Kategori dengan nama '{clean_name}' sudah ada.")
+        updated = await self.menu_repo.update_category(cat, name=clean_name, description=description)
+        return {"id": updated.id, "name": updated.name, "description": updated.description}
+
+    async def delete_category(self, category_id: int) -> dict[str, Any]:
+        cat = await self.menu_repo.get_category_by_id(category_id)
+        if not cat:
+            raise CategoryNotFoundError(f"Kategori dengan ID {category_id} tidak ditemukan.")
+        has_items = await self.menu_repo.count_menu_items_by_category(category_id)
+        if has_items > 0:
+            raise CategoryInUseError("Kategori masih digunakan oleh menu dan tidak dapat dihapus.")
+        await self.menu_repo.delete_category(cat)
+        return {"id": category_id, "action": "deleted"}
 
     async def create_menu_item(
         self,

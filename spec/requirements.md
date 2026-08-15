@@ -414,16 +414,44 @@ Dashboard hanya dapat diakses oleh authenticated Restaurant Admin.
 
 ## DR-002 — Menu Management
 
+Admin harus dapat mengelola menu restoran melalui Admin Dashboard.
+
 Admin harus dapat:
 
-* melihat menu;
-* membuat menu;
-* mengubah menu;
-* menghapus/deactivate menu;
-* mengubah harga;
-* mengubah availability;
-* mengelola category;
-* mengelola menu description.
+* melihat daftar menu;
+* membuat menu baru;
+* mengubah informasi menu;
+* mengubah status ketersediaan menu;
+* mengelola kategori menu.
+
+### Category Management
+
+Admin harus dapat:
+
+* melihat seluruh kategori menu;
+* membuat kategori baru;
+* mengubah nama dan deskripsi kategori;
+* menghapus kategori apabila tidak digunakan oleh menu item.
+
+Setiap kategori minimal memiliki:
+
+* `id`;
+* `name`;
+* `description`.
+
+Nama kategori harus unik dalam satu restoran.
+
+Kategori yang masih digunakan oleh satu atau lebih menu item tidak boleh dihapus apabila penghapusan tersebut akan menyebabkan menu item kehilangan referensi kategori.
+
+Admin harus mendapatkan pesan error yang jelas apabila mencoba menghapus kategori yang masih digunakan.
+
+### Dynamic Category Selection
+
+Form pembuatan dan pengubahan menu pada Admin Dashboard harus mengambil daftar kategori dari backend.
+
+Kategori tidak boleh di-hardcode di frontend.
+
+Setiap kategori yang dibuat melalui Category Management harus tersedia secara otomatis sebagai pilihan ketika admin membuat atau mengubah menu item.
 
 ---
 
@@ -559,6 +587,7 @@ Sistem harus mempertahankan:
 * dining session;
 * order;
 * order item;
+
 Untuk setiap `order item`, sistem harus mempertahankan informasi historis berikut:
 
 * `menu_item_id` sebagai referensi menu asal;
@@ -593,6 +622,7 @@ maka order lama harus tetap menampilkan:
 Name       = "Indomie Rebus"
 Unit Price = Rp25.000
 ```
+---
 * payment status;
 * payment timeout information;
 * customer preferences;
@@ -666,21 +696,27 @@ Unit Price = Rp25.000
 12. Customer can save a menu as favorite.
 13. Customer can create an order draft.
 14. Customer must explicitly confirm the order before submission.
-15. Admin can see the submitted order.
-16. Admin can change order status.
-17. When the order becomes `DONE`, its completion time becomes the session activity timestamp.
-18. Session inactivity timeout starts from the last completed (`DONE`) order.
-19. If there has been no order, session timeout starts from session creation.
-20. Admin can manually mark payment as paid.
-21. Payment timeout starts when the order becomes `DONE`.
-22. An unpaid order remains `UNPAID` after payment timeout and is marked overdue.
-23. Customer receives a warning before manually terminating a session with unpaid orders.
-24. Customer can terminate the session using `/done`.
-25. The table becomes available after session termination.
-26. Session automatically terminates after the configured inactivity timeout.
-27. Customer preferences and favorites persist across sessions.
-28. Admin can inspect customer memory and descriptions.
-29. Admin can manage menu CRUD including descriptions.
-30. Admin can see popular menu statistics.
-31. Admin can see table usage statistics.
-32. Dashboard authentication is protected by JWT.
+15. Order item menyimpan snapshot nama menu pada saat order dibuat.
+16. Order item menyimpan snapshot harga menu pada saat order dibuat.
+17. Perubahan nama menu setelah order dibuat tidak mengubah nama pada order lama.
+18. Perubahan harga menu setelah order dibuat tidak mengubah harga pada order lama.
+19. `menu_item_id` tetap dipertahankan sebagai referensi ke menu asal.
+20. Nama dan harga order item harus berasal dari data menu yang tervalidasi di server, bukan dari input LLM atau customer.
+21. Admin can see the submitted order.
+22. Admin can change order status.
+23. When the order becomes `DONE`, its completion time becomes the session activity timestamp.
+24. Session inactivity timeout starts from the last completed (`DONE`) order.
+25. If there has been no order, session timeout starts from session creation.
+26. Admin can manually mark payment as paid.
+27. Payment timeout starts when the order becomes `DONE`.
+28. An unpaid order remains `UNPAID` after payment timeout and is marked overdue.
+29. Customer receives a warning before manually terminating a session with unpaid orders.
+30. Customer can terminate the session using `/done`.
+31. The table becomes available after session termination.
+32. Session automatically terminates after the configured inactivity timeout.
+33. Customer preferences and favorites persist across sessions.
+34. Admin can inspect customer memory and descriptions.
+35. Admin can manage menu CRUD including descriptions.
+36. Admin can see popular menu statistics.
+37. Admin can see table usage statistics.
+38. Dashboard authentication is protected by JWT.

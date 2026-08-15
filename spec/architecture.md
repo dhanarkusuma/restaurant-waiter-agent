@@ -542,25 +542,104 @@ The agent accesses memory through explicit tools.
 
 ---
 
-# 14. Menu Data Architecture
+## 14. Menu Data Architecture
 
-Menu data is structured and stored in PostgreSQL.
+Menu data is persisted in PostgreSQL and managed through separate application and repository layers.
 
-Example conceptual model:
+### 14.1 Menu Categories
+
+Menu categories are persistent entities used to group menu items.
+
+Each category contains at minimum:
+
+* `id`;
+* `name`;
+* `description`.
+
+Category names must be unique within the restaurant.
+
+Category management is an administrative operation and must be protected by the existing Admin JWT authentication boundary.
+
+### 14.2 Category Management
+
+The Admin Dashboard must retrieve categories from the backend and must not maintain a hardcoded list of category names.
+
+The category management flow is:
 
 ```text
-Menu
-├── id
-├── name
-├── description
-├── category_id
-├── price
-├── available
-├── created_at
-└── updated_at
+Admin Dashboard
+       |
+       v
+GET /api/admin/categories
+       |
+       v
+Category Service
+       |
+       v
+Category Repository
+       |
+       v
+PostgreSQL
 ```
 
-`description` stores natural-language menu information that can be used by the AI waiter.
+Administrators can:
+
+* view categories;
+* create categories;
+* update category name and description;
+* delete categories that are not referenced by menu items.
+
+Category deletion must be validated by the backend.
+
+A category that is still referenced by one or more menu items must not be deleted if doing so would orphan the menu items. The backend must reject the deletion and return a clear validation error.
+
+The system must not silently orphan menu items.
+
+### 14.3 Menu Category Selection
+
+When creating or editing a menu item, the Admin Dashboard must retrieve the available categories from the backend.
+
+```text
+Admin Dashboard
+       |
+       +-- GET /api/admin/categories
+       |
+       v
+Category List
+       |
+       v
+Menu Create/Edit Form
+       |
+       v
+category_id
+       |
+       v
+Menu API
+```
+
+Category names must not be hardcoded in the frontend.
+
+A category created through Category Management must automatically become available as a selectable category for menu creation and editing.
+
+The backend remains the authoritative source for category data and validation.
+
+### 14.4 Menu and Category Relationship
+
+Each menu item may reference a menu category through `category_id`.
+
+The relationship is maintained by PostgreSQL and must preserve referential integrity.
+
+```text
+MenuCategory
+    |
+    | 1 : N
+    v
+MenuItem
+```
+
+Category deletion rules must be enforced at the application layer and must not depend solely on frontend validation.
+
+Customer-facing Telegram and Google ADK Agent components must not have access to administrative category management operations.
 
 ---
 

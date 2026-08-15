@@ -84,12 +84,30 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
 
-  // New Menu Item Form
+  // Menu & Category Management State
+  const [menuSubTab, setMenuSubTab] = useState<'items' | 'categories'>('items');
   const [showAddMenuModal, setShowAddMenuModal] = useState<boolean>(false);
   const [newMenuName, setNewMenuName] = useState('');
   const [newMenuPrice, setNewMenuPrice] = useState<number>(25000);
   const [newMenuCategory, setNewMenuCategory] = useState<number | undefined>(undefined);
   const [newMenuDesc, setNewMenuDesc] = useState('');
+
+  const [showEditMenuModal, setShowEditMenuModal] = useState<boolean>(false);
+  const [editingMenuItem, setEditingMenuItem] = useState<MenuItem | null>(null);
+  const [editMenuName, setEditMenuName] = useState('');
+  const [editMenuPrice, setEditMenuPrice] = useState<number>(0);
+  const [editMenuCategory, setEditMenuCategory] = useState<number | undefined>(undefined);
+  const [editMenuDesc, setEditMenuDesc] = useState('');
+  const [editMenuAvailable, setEditMenuAvailable] = useState<boolean>(true);
+
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState<boolean>(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryDesc, setNewCategoryDesc] = useState('');
+
+  const [showEditCategoryModal, setShowEditCategoryModal] = useState<boolean>(false);
+  const [editingCategory, setEditingCategory] = useState<MenuCategory | null>(null);
+  const [editCategoryName, setEditCategoryName] = useState('');
+  const [editCategoryDesc, setEditCategoryDesc] = useState('');
 
   useEffect(() => {
     const handleUnauthorized = () => setIsAuthenticated(false);
@@ -338,6 +356,79 @@ export default function App() {
       loadDashboardData();
     } catch (err: any) {
       alert(`Gagal menambahkan menu: ${err.message}`);
+    }
+  };
+
+  const handleOpenEditMenu = (item: MenuItem) => {
+    setEditingMenuItem(item);
+    setEditMenuName(item.name);
+    setEditMenuPrice(item.price);
+    setEditMenuCategory(item.category_id);
+    setEditMenuDesc(item.description || '');
+    setEditMenuAvailable(item.is_available);
+    setShowEditMenuModal(true);
+  };
+
+  const handleUpdateMenuItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMenuItem) return;
+    try {
+      await api.updateMenuItem(editingMenuItem.id, {
+        name: editMenuName,
+        price: Number(editMenuPrice),
+        category_id: editMenuCategory,
+        description: editMenuDesc,
+        is_available: editMenuAvailable,
+      });
+      setShowEditMenuModal(false);
+      setEditingMenuItem(null);
+      loadDashboardData();
+    } catch (err: any) {
+      alert(`Gagal memperbarui menu: ${err.message}`);
+    }
+  };
+
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const newCat = await api.createCategory(newCategoryName, newCategoryDesc || undefined);
+      setShowAddCategoryModal(false);
+      setNewCategoryName('');
+      setNewCategoryDesc('');
+      await loadDashboardData();
+      if (!newMenuCategory) setNewMenuCategory(newCat.id);
+    } catch (err: any) {
+      alert(`Gagal membuat kategori: ${err.message}`);
+    }
+  };
+
+  const handleOpenEditCategory = (cat: MenuCategory) => {
+    setEditingCategory(cat);
+    setEditCategoryName(cat.name);
+    setEditCategoryDesc(cat.description || '');
+    setShowEditCategoryModal(true);
+  };
+
+  const handleUpdateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCategory) return;
+    try {
+      await api.updateCategory(editingCategory.id, editCategoryName, editCategoryDesc || undefined);
+      setShowEditCategoryModal(false);
+      setEditingCategory(null);
+      await loadDashboardData();
+    } catch (err: any) {
+      alert(`Gagal memperbarui kategori: ${err.message}`);
+    }
+  };
+
+  const handleDeleteCategory = async (cat: MenuCategory) => {
+    if (!confirm(`Hapus kategori "${cat.name}"?`)) return;
+    try {
+      await api.deleteCategory(cat.id);
+      await loadDashboardData();
+    } catch (err: any) {
+      alert(`Gagal menghapus kategori: ${err.message}`);
     }
   };
 
@@ -1025,43 +1116,122 @@ export default function App() {
           {/* MENU TAB */}
           {activeTab === 'menu' && (
             <div className="space-y-4">
-              <div className="flex justify-between items-center bg-slate-900 p-4 rounded-xl border border-slate-800">
-                <span className="text-sm text-slate-300 font-semibold">Daftar Menu & Ketersediaan</span>
-                <button
-                  onClick={() => setShowAddMenuModal(true)}
-                  className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold px-3 py-1.5 rounded-lg text-xs flex items-center space-x-1.5 transition"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Tambah Menu</span>
-                </button>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900 p-4 rounded-xl border border-slate-800">
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setMenuSubTab('items')}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                      menuSubTab === 'items'
+                        ? 'bg-amber-500 text-slate-950 shadow'
+                        : 'bg-slate-800 text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    Daftar Menu ({menuItems.length})
+                  </button>
+                  <button
+                    onClick={() => setMenuSubTab('categories')}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                      menuSubTab === 'categories'
+                        ? 'bg-amber-500 text-slate-950 shadow'
+                        : 'bg-slate-800 text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    Kategori Menu ({categories.length})
+                  </button>
+                </div>
+
+                {menuSubTab === 'items' ? (
+                  <button
+                    onClick={() => setShowAddMenuModal(true)}
+                    className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold px-3 py-1.5 rounded-lg text-xs flex items-center space-x-1.5 transition"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Tambah Menu</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setShowAddCategoryModal(true)}
+                    className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold px-3 py-1.5 rounded-lg text-xs flex items-center space-x-1.5 transition"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Tambah Kategori</span>
+                  </button>
+                )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {menuItems.map((item) => (
-                  <div key={item.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-3">
-                    <div>
-                      <div className="flex justify-between items-start">
-                        <span className="font-bold text-sm text-slate-100">{item.name}</span>
-                        <span className="text-xs font-semibold text-amber-400">Rp {item.price.toLocaleString('id-ID')}</span>
+              {menuSubTab === 'items' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {menuItems.map((item) => (
+                    <div key={item.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-3">
+                      <div>
+                        <div className="flex justify-between items-start">
+                          <span className="font-bold text-sm text-slate-100">{item.name}</span>
+                          <span className="text-xs font-semibold text-amber-400">Rp {item.price.toLocaleString('id-ID')}</span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 uppercase font-semibold">{item.category_name || 'Tanpa Kategori'}</span>
+                        {item.description && <p className="text-xs text-slate-400 mt-1">{item.description}</p>}
                       </div>
-                      <span className="text-[10px] text-slate-500 uppercase font-semibold">{item.category_name || 'Umum'}</span>
-                      {item.description && <p className="text-xs text-slate-400 mt-1">{item.description}</p>}
-                    </div>
 
-                    <div className="pt-2 border-t border-slate-800 flex justify-between items-center">
-                      <span className={`text-[10px] px-2 py-0.5 rounded font-semibold ${item.is_available ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
-                        {item.is_available ? 'Tersedia' : 'Habis (Unavailable)'}
-                      </span>
-                      <button
-                        onClick={() => handleToggleMenuAvailability(item.id, item.is_available)}
-                        className="text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded transition"
-                      >
-                        {item.is_available ? 'Set Habis' : 'Set Tersedia'}
-                      </button>
+                      <div className="pt-2 border-t border-slate-800 flex justify-between items-center">
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-semibold ${item.is_available ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                          {item.is_available ? 'Tersedia' : 'Habis (Unavailable)'}
+                        </span>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleOpenEditMenu(item)}
+                            className="text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded transition flex items-center space-x-1"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                            <span>Ubah</span>
+                          </button>
+                          <button
+                            onClick={() => handleToggleMenuAvailability(item.id, item.is_available)}
+                            className="text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded transition"
+                          >
+                            {item.is_available ? 'Set Habis' : 'Set Tersedia'}
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {categories.map((cat) => {
+                    const count = menuItems.filter((m) => m.category_id === cat.id).length;
+                    return (
+                      <div key={cat.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-3">
+                        <div>
+                          <div className="flex justify-between items-start">
+                            <span className="font-bold text-sm text-slate-100">{cat.name}</span>
+                            <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-mono">
+                              {count} Menu
+                            </span>
+                          </div>
+                          {cat.description && <p className="text-xs text-slate-400 mt-2">{cat.description}</p>}
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-800 flex justify-end space-x-2">
+                          <button
+                            onClick={() => handleOpenEditCategory(cat)}
+                            className="text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded transition flex items-center space-x-1"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>Ubah</span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCategory(cat)}
+                            className="text-xs text-red-400 hover:text-red-300 bg-red-950/40 hover:bg-red-900/50 border border-red-800/40 px-2.5 py-1 rounded transition flex items-center space-x-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Hapus</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -1401,6 +1571,7 @@ export default function App() {
                       value={newMenuName}
                       onChange={(e) => setNewMenuName(e.target.value)}
                       required
+                      placeholder="Contoh: Nasi Goreng Spesial"
                       className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none"
                     />
                   </div>
@@ -1416,17 +1587,23 @@ export default function App() {
                   </div>
                   <div>
                     <label className="block text-xs text-slate-400 mb-1">Kategori</label>
-                    <select
-                      value={newMenuCategory || ''}
-                      onChange={(e) => setNewMenuCategory(Number(e.target.value))}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none"
-                    >
-                      {categories.map((cat) => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </option>
-                      ))}
-                    </select>
+                    {categories.length > 0 ? (
+                      <select
+                        value={newMenuCategory || ''}
+                        onChange={(e) => setNewMenuCategory(Number(e.target.value))}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none"
+                      >
+                        {categories.map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="text-xs text-amber-400 p-2 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                        Belum ada kategori. Buat kategori baru di tab Kategori Menu.
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs text-slate-400 mb-1">Deskripsi</label>
@@ -1434,6 +1611,7 @@ export default function App() {
                       value={newMenuDesc}
                       onChange={(e) => setNewMenuDesc(e.target.value)}
                       rows={2}
+                      placeholder="Deskripsi bahan, cita rasa, porsi..."
                       className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none"
                     />
                   </div>
@@ -1450,6 +1628,185 @@ export default function App() {
                       className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold px-4 py-2 rounded-lg"
                     >
                       Simpan
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Edit Menu Modal */}
+          {showEditMenuModal && editingMenuItem && (
+            <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 max-w-md w-full space-y-4">
+                <h3 className="font-bold text-slate-100">Ubah Menu: {editingMenuItem.name}</h3>
+                <form onSubmit={handleUpdateMenuItem} className="space-y-3 text-sm">
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Nama Menu</label>
+                    <input
+                      type="text"
+                      value={editMenuName}
+                      onChange={(e) => setEditMenuName(e.target.value)}
+                      required
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Harga (Rp)</label>
+                    <input
+                      type="number"
+                      value={editMenuPrice}
+                      onChange={(e) => setEditMenuPrice(Number(e.target.value))}
+                      required
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Kategori</label>
+                    <select
+                      value={editMenuCategory || ''}
+                      onChange={(e) => setEditMenuCategory(Number(e.target.value))}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none"
+                    >
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Deskripsi</label>
+                    <textarea
+                      value={editMenuDesc}
+                      onChange={(e) => setEditMenuDesc(e.target.value)}
+                      rows={2}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2 pt-1">
+                    <input
+                      type="checkbox"
+                      id="editMenuAvailable"
+                      checked={editMenuAvailable}
+                      onChange={(e) => setEditMenuAvailable(e.target.checked)}
+                      className="rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-0"
+                    />
+                    <label htmlFor="editMenuAvailable" className="text-xs text-slate-300 select-none">
+                      Tersedia untuk dipesan (Available)
+                    </label>
+                  </div>
+                  <div className="flex justify-end space-x-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowEditMenuModal(false);
+                        setEditingMenuItem(null);
+                      }}
+                      className="px-3 py-2 text-slate-400 hover:text-white"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold px-4 py-2 rounded-lg"
+                    >
+                      Simpan Perubahan
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Add Category Modal */}
+          {showAddCategoryModal && (
+            <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 max-w-md w-full space-y-4">
+                <h3 className="font-bold text-slate-100">Tambah Kategori Menu Baru</h3>
+                <form onSubmit={handleCreateCategory} className="space-y-3 text-sm">
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Nama Kategori</label>
+                    <input
+                      type="text"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      required
+                      placeholder="Contoh: Makanan Penutup"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Deskripsi (Opsional)</label>
+                    <textarea
+                      value={newCategoryDesc}
+                      onChange={(e) => setNewCategoryDesc(e.target.value)}
+                      rows={2}
+                      placeholder="Deskripsi kelompok kategori ini..."
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddCategoryModal(false)}
+                      className="px-3 py-2 text-slate-400 hover:text-white"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold px-4 py-2 rounded-lg"
+                    >
+                      Simpan
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Edit Category Modal */}
+          {showEditCategoryModal && editingCategory && (
+            <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 max-w-md w-full space-y-4">
+                <h3 className="font-bold text-slate-100">Ubah Kategori: {editingCategory.name}</h3>
+                <form onSubmit={handleUpdateCategory} className="space-y-3 text-sm">
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Nama Kategori</label>
+                    <input
+                      type="text"
+                      value={editCategoryName}
+                      onChange={(e) => setEditCategoryName(e.target.value)}
+                      required
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Deskripsi (Opsional)</label>
+                    <textarea
+                      value={editCategoryDesc}
+                      onChange={(e) => setEditCategoryDesc(e.target.value)}
+                      rows={2}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowEditCategoryModal(false);
+                        setEditingCategory(null);
+                      }}
+                      className="px-3 py-2 text-slate-400 hover:text-white"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold px-4 py-2 rounded-lg"
+                    >
+                      Simpan Perubahan
                     </button>
                   </div>
                 </form>

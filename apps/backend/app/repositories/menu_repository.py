@@ -36,6 +36,35 @@ class MenuRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_category_by_name(self, name: str) -> MenuCategory | None:
+        result = await self.session.execute(
+            select(MenuCategory).where(MenuCategory.name.ilike(name.strip()))
+        )
+        return result.scalar_one_or_none()
+
+    async def count_menu_items_by_category(self, category_id: int) -> int:
+        result = await self.session.execute(
+            select(MenuItem).where(MenuItem.category_id == category_id).limit(1)
+        )
+        return 1 if result.scalar_one_or_none() is not None else 0
+
+    async def update_category(
+        self,
+        category: MenuCategory,
+        name: str | None = None,
+        description: str | None = None,
+    ) -> MenuCategory:
+        if name is not None:
+            category.name = name.strip()
+        if description is not None:
+            category.description = description
+        await self.session.flush()
+        return category
+
+    async def delete_category(self, category: MenuCategory) -> None:
+        await self.session.delete(category)
+        await self.session.flush()
+
     async def search(
         self,
         query: str | None = None,

@@ -46,3 +46,19 @@ class OrderNotFoundError(DomainException):
 class InvalidOrderStatusTransitionError(DomainException):
     def __init__(self, message: str = "Invalid order status transition"):
         super().__init__(message)
+
+
+class CategoryNotFoundError(DomainException):
+    def __init__(self, message: str = "Category not found"):
+        super().__init__(message)
+
+
+class CategoryAlreadyExistsError(DomainException):
+    def __init__(self, message: str = "Category name already exists"):
+        super().__init__(message)
+
+
+class CategoryInUseError(DomainException):
+    def __init__(self, message: str = "Category is still referenced by menu items"):
+        super().__init__(message)
+
