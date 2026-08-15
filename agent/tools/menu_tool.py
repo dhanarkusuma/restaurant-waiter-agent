@@ -18,6 +18,11 @@ def reset_tool_session_factory() -> None:
     _session_factory = AsyncSessionLocal
 
 
+def get_tool_session():
+    """Return context manager for tool db session using current factory."""
+    return _session_factory()
+
+
 async def search_available_menu(
     query: str | None = None,
     category: str | None = None,
@@ -37,7 +42,7 @@ async def search_available_menu(
     Returns:
         Daftar menu yang tersedia lengkap dengan id, name, category, price (harga dalam Rp), dan description.
     """
-    async with _session_factory() as session:
+    async with get_tool_session() as session:
         service = MenuService(session)
         return await service.search_menu(
             query=query if query else None,
@@ -58,7 +63,7 @@ async def get_menu_details(menu_id: int) -> dict[str, Any]:
     Returns:
         Rincian menu meliputi id, nama, kategori, harga, deskripsi, dan ketersediaan.
     """
-    async with _session_factory() as session:
+    async with get_tool_session() as session:
         service = MenuService(session)
         details = await service.get_menu_details(menu_id)
         if not details:

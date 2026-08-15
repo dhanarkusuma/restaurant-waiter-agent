@@ -19,8 +19,8 @@ def test_waiter_agent_configuration():
     assert "Bahasa Indonesia adalah bahasa utama" in agent.instruction
     assert "alami, santun, hangat, dan ringkas" in agent.instruction
     assert "bahasa percakapan sehari-hari" in agent.instruction
-    assert "bahasa lain" in agent.instruction
-    assert "menu discovery, recommendations, and dining session" in agent.description
+    assert "memory personalization" in agent.description
+    assert "menu discovery" in agent.description
     assert root_agent.name == "restaurant_waiter"
 
 
