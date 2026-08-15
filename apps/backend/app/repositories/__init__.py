@@ -1,1 +1,9 @@
-"""Data access repositories for PostgreSQL operations."""
+from apps.backend.app.repositories.customer_repository import CustomerRepository
+from apps.backend.app.repositories.session_repository import SessionRepository
+from apps.backend.app.repositories.table_repository import TableRepository
+
+__all__ = [
+    "CustomerRepository",
+    "SessionRepository",
+    "TableRepository",
+]
