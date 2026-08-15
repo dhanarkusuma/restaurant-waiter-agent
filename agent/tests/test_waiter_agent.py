@@ -20,7 +20,7 @@ def test_waiter_agent_configuration():
     assert "alami, santun, hangat, dan ringkas" in agent.instruction
     assert "bahasa percakapan sehari-hari" in agent.instruction
     assert "bahasa lain" in agent.instruction
-    assert agent.description == "AI Waiter Agent helping restaurant customers with their dining session"
+    assert "menu discovery, recommendations, and dining session" in agent.description
     assert root_agent.name == "restaurant_waiter"
 
 
