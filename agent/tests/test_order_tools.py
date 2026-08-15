@@ -209,9 +209,11 @@ async def test_order_persistence_in_separate_db_session(
         persisted_items = (await fresh_session.execute(stmt_items)).scalars().all()
         assert len(persisted_items) == 1
         assert persisted_items[0].menu_item_id == env["item1"].id
+        assert persisted_items[0].name == "Bebek Goreng Madura"
         assert persisted_items[0].quantity == 2
         assert persisted_items[0].unit_price == 40000
         assert persisted_items[0].subtotal == 80000
         assert persisted_items[0].notes == "pedas"
+
 
 

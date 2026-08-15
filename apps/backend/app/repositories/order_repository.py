@@ -95,6 +95,7 @@ class OrderRepository:
             order_item = OrderItem(
                 order_id=order.id,
                 menu_item_id=item_data["menu_item_id"],
+                name=item_data["name"],
                 quantity=item_data["quantity"],
                 unit_price=item_data["unit_price"],
                 subtotal=item_data["subtotal"],

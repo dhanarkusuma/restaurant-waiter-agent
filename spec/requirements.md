@@ -208,6 +208,21 @@ Order harus memiliki:
 * payment status;
 * timestamps.
 
+Order item harus mempertahankan snapshot informasi menu pada saat order dibuat.
+
+Setiap order item harus menyimpan:
+
+* `menu_item_id` sebagai referensi ke menu asal;
+* `name` sebagai snapshot nama menu pada saat order dibuat;
+* `quantity`;
+* `unit_price` sebagai snapshot harga pada saat order dibuat;
+* `subtotal`;
+* `notes`.
+
+Snapshot `name` dan `unit_price` harus diperoleh dari data menu yang tervalidasi di PostgreSQL pada saat order dibuat.
+
+Customer maupun AI waiter tidak boleh menentukan atau mengganti nilai historis `name` atau `unit_price` secara langsung.
+
 Customer harus dapat meninjau order sebelum melakukan konfirmasi.
 
 Customer harus memberikan konfirmasi eksplisit sebelum order dikirim ke restaurant.
@@ -544,6 +559,40 @@ Sistem harus mempertahankan:
 * dining session;
 * order;
 * order item;
+Untuk setiap `order item`, sistem harus mempertahankan informasi historis berikut:
+
+* `menu_item_id` sebagai referensi menu asal;
+* `name` sebagai snapshot nama menu saat order dibuat;
+* `unit_price` sebagai snapshot harga saat order dibuat;
+* `quantity`;
+* `subtotal`;
+* `notes`.
+
+Perubahan terhadap `menu item` setelah order dibuat tidak boleh mengubah informasi historis pada `order item`.
+
+Contoh:
+
+Saat order dibuat:
+
+```text
+Menu:
+Name  = "Indomie Rebus"
+Price = Rp25.000
+
+OrderItem:
+Name       = "Indomie Rebus"
+Unit Price = Rp25.000
+
+Jika admin kemudian mengubah menu menjadi:
+
+Name  = "Indomie Rebus Spesial"
+Price = Rp30.000
+
+maka order lama harus tetap menampilkan:
+
+Name       = "Indomie Rebus"
+Unit Price = Rp25.000
+```
 * payment status;
 * payment timeout information;
 * customer preferences;

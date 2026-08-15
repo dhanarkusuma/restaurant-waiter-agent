@@ -490,6 +490,23 @@ When an order becomes `DONE`, the backend transaction must update relevant sessi
 
 ---
 
+### 12.1 Order Item Historical Snapshot
+
+`OrderItem` must preserve the menu information that was effective at the time the order was created.
+
+Conceptually:
+
+```text
+OrderItem
+├── id
+├── order_id
+├── menu_item_id
+├── name
+├── quantity
+├── unit_price
+├── subtotal
+└── notes
+
 # 13. Customer Memory Architecture
 
 Customer memory is persistent and customer-scoped.

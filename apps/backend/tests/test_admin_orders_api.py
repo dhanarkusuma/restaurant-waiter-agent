@@ -121,3 +121,37 @@ async def test_admin_manual_payment_api(client: AsyncClient, admin_auth_header: 
     res_pay_again = await client.post(f"/api/admin/orders/{order_id}/pay", headers=admin_auth_header)
     assert res_pay_again.status_code == 200
     assert res_pay_again.json()["payment_status"] == PaymentStatus.PAID.value
+
+
+@pytest.mark.asyncio
+async def test_admin_order_api_returns_historical_snapshot_after_menu_rename(
+    client: AsyncClient,
+    admin_auth_header: dict[str, str],
+    sample_order,
+    db_session: AsyncSession,
+):
+    """Test that Admin Order API returns snapshot name and unit_price even if MenuItem is modified."""
+    order_id = sample_order["order_id"]
+
+    # 1. Fetch before rename
+    res_get = await client.get(f"/api/admin/orders/{order_id}", headers=admin_auth_header)
+    assert res_get.status_code == 200
+    items = res_get.json()["items"]
+    assert len(items) == 1
+    assert items[0]["name"] == "Soto Ayam"
+    assert items[0]["unit_price"] == 20000
+
+    # 2. Rename menu item in database
+    menu_repo = MenuRepository(db_session)
+    item = await menu_repo.get_by_name("Soto Ayam")
+    assert item is not None
+    await menu_repo.update_item(item, name="Soto Ayam Lamongan Istimewa", price=35000)
+
+    # 3. Fetch after rename: API must still return historical snapshot name & price
+    res_get_after = await client.get(f"/api/admin/orders/{order_id}", headers=admin_auth_header)
+    assert res_get_after.status_code == 200
+    items_after = res_get_after.json()["items"]
+    assert len(items_after) == 1
+    assert items_after[0]["name"] == "Soto Ayam"
+    assert items_after[0]["unit_price"] == 20000
+

@@ -13,6 +13,7 @@ class OrderItemResponse(BaseModel):
 
     id: int
     menu_item_id: int
+    name: str
     quantity: int
     unit_price: int
     subtotal: int

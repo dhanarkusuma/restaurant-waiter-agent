@@ -110,6 +110,7 @@ async def test_menu_and_order_models(db_session: AsyncSession):
     order_item = OrderItem(
         order_id=order.id,
         menu_item_id=menu_item.id,
+        name=menu_item.name,
         quantity=1,
         unit_price=35000,
         subtotal=35000,
