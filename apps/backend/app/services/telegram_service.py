@@ -3,6 +3,7 @@ from typing import Any
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agent.runner import WaiterAgentRunner, default_waiter_runner
 from apps.backend.app.config import settings
 from apps.backend.app.exceptions import (
     CustomerAlreadyHasActiveSessionError,
@@ -19,11 +20,16 @@ logger = logging.getLogger(__name__)
 
 
 class TelegramService:
-    def __init__(self, db: AsyncSession):
+    def __init__(
+        self,
+        db: AsyncSession,
+        agent_runner: WaiterAgentRunner | None = None,
+    ):
         self.db = db
         self.customer_repo = CustomerRepository(db)
         self.table_repo = TableRepository(db)
         self.session_service = SessionService(db)
+        self.agent_runner = agent_runner or default_waiter_runner
 
     async def get_or_create_customer(
         self,
@@ -61,7 +67,7 @@ class TelegramService:
         - Customer resolution
         - QR deep-link table reservation flow (/start <qr_token>)
         - Session termination (/done)
-        - Session-aware guidance
+        - ADK Waiter Agent conversation flow when session is active
         """
         message = update.message or update.edited_message
         if not message or not message.from_user or not message.text:
@@ -106,14 +112,17 @@ class TelegramService:
         elif raw_text == "/done":
             response_text = await self._handle_done_command(customer=customer)
 
-        # 4. Generic message flow
+        # 4. Conversational message flow with Google ADK Agent
         else:
             active_session = await self.session_service.get_active_session_for_customer(customer.id)
             if active_session:
                 table = active_session.table or await self.table_repo.get_by_id(active_session.table_id)
                 table_name = table.table_number if table else f"#{active_session.table_id}"
-                response_text = (
-                    f"Anda terhubung dengan Meja {table_name}. Sesi makan Anda aktif."
+                response_text = await self.agent_runner.handle_customer_message(
+                    customer_id=customer.id,
+                    session_id=active_session.id,
+                    message_text=raw_text,
+                    table_number=table_name,
                 )
             else:
                 response_text = (
