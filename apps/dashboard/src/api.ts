@@ -87,6 +87,42 @@ export interface TableUsage {
   total_sessions: number;
 }
 
+export interface ActiveCustomerInfo {
+  customer_id: number;
+  telegram_id: number;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+}
+
+export interface ActiveSessionInfo {
+  session_id: number;
+  started_at: string;
+  last_order_completed_at?: string;
+  customer?: ActiveCustomerInfo;
+}
+
+export interface TableLayout {
+  id: number;
+  table_number: string;
+  status: 'AVAILABLE' | 'OCCUPIED';
+  capacity: number;
+  position_x: number;
+  position_y: number;
+  is_active: boolean;
+  qr_code_token: string;
+  deep_link_url: string;
+  created_at: string;
+  active_session?: ActiveSessionInfo;
+}
+
+export interface TableQRInfo {
+  table_id: number;
+  table_number: string;
+  qr_code_token: string;
+  deep_link_url: string;
+}
+
 class ApiClient {
   private getToken(): string | null {
     return localStorage.getItem('admin_token');
@@ -149,6 +185,42 @@ class ApiClient {
 
   async getMe() {
     return this.request<AdminUser>('/admin/auth/me');
+  }
+
+  // Tables
+  async listTables(includeInactive: boolean = true) {
+    return this.request<TableLayout[]>(`/admin/tables?include_inactive=${includeInactive}`);
+  }
+
+  async createTable(payload: { table_number: string; capacity: number; position_x?: number; position_y?: number }) {
+    return this.request<TableLayout>('/admin/tables', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateTable(id: number, payload: { table_number?: string; capacity?: number }) {
+    return this.request<TableLayout>(`/admin/tables/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateTablePosition(id: number, position_x: number, position_y: number) {
+    return this.request<TableLayout>(`/admin/tables/${id}/position`, {
+      method: 'PATCH',
+      body: JSON.stringify({ position_x, position_y }),
+    });
+  }
+
+  async deactivateTable(id: number) {
+    return this.request<{ id: number; action: string; message: string }>(`/admin/tables/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getTableQR(id: number) {
+    return this.request<TableQRInfo>(`/admin/tables/${id}/qr`);
   }
 
   // Orders

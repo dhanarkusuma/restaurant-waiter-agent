@@ -1,4 +1,9 @@
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import Any
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from apps.backend.app.database import AsyncSessionLocal
 from apps.backend.app.services.menu_service import MenuService
 
@@ -18,9 +23,25 @@ def reset_tool_session_factory() -> None:
     _session_factory = AsyncSessionLocal
 
 
-def get_tool_session():
-    """Return context manager for tool db session using current factory."""
-    return _session_factory()
+@asynccontextmanager
+async def get_tool_session() -> AsyncGenerator[AsyncSession, None]:
+    """Return async context manager for tool db session with auto-commit on success."""
+    session_obj = _session_factory()
+    if hasattr(session_obj, "__aenter__"):
+        async with session_obj as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+    else:
+        try:
+            yield session_obj
+            await session_obj.commit()
+        except Exception:
+            await session_obj.rollback()
+            raise
 
 
 async def search_available_menu(

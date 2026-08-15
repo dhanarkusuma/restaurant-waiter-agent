@@ -98,6 +98,9 @@ ADMIN_USERNAME=admin ADMIN_PASSWORD=your_secure_password uv run python scripts/s
 # Start FastAPI backend
 uv run uvicorn apps.backend.app.main:app --reload --port 8000
 
+# Start tunnel backend if run on local
+cloudflared tunnel --url http://localhost:8000
+
 # Start React Admin Dashboard (in another terminal)
 cd apps/dashboard && npm run dev
 ```
@@ -106,4 +109,11 @@ cd apps/dashboard && npm run dev
 
 ```bash
 uv run --extra dev pytest
+```
+
+### 8. Dependencies
+
+```bash
+# install cloudflared tunnel
+winget install --id Cloudflare.cloudflared
 ```

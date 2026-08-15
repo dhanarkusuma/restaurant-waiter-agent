@@ -25,7 +25,10 @@ class SessionRepository:
             select(DiningSession).where(
                 DiningSession.customer_id == customer_id,
                 DiningSession.status == SessionStatus.ACTIVE,
-            ).options(selectinload(DiningSession.table))
+            ).options(
+                selectinload(DiningSession.table),
+                selectinload(DiningSession.customer),
+            )
         )
         return result.scalar_one_or_none()
 
@@ -34,7 +37,10 @@ class SessionRepository:
             select(DiningSession).where(
                 DiningSession.table_id == table_id,
                 DiningSession.status == SessionStatus.ACTIVE,
-            ).options(selectinload(DiningSession.table))
+            ).options(
+                selectinload(DiningSession.table),
+                selectinload(DiningSession.customer),
+            )
         )
         return result.scalar_one_or_none()
 
@@ -42,7 +48,10 @@ class SessionRepository:
         result = await self.session.execute(
             select(DiningSession).where(
                 DiningSession.status == SessionStatus.ACTIVE
-            ).options(selectinload(DiningSession.table))
+            ).options(
+                selectinload(DiningSession.table),
+                selectinload(DiningSession.customer),
+            )
         )
         return list(result.scalars().all())
 

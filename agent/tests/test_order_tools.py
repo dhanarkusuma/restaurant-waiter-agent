@@ -153,3 +153,65 @@ async def test_order_drafting_and_confirmation_tool_flow(sample_order_fixture):
     # 5. Verify draft is now empty
     draft_after = await view_order_draft(tool_context=ctx)
     assert draft_after["is_empty"] is True
+
+
+@pytest.mark.asyncio
+async def test_order_persistence_in_separate_db_session(
+    sample_order_fixture,
+):
+    """
+    Regression test for order persistence bug in Telegram flow:
+    Ensures that when confirm_and_place_order tool runs, the transaction is committed
+    and the created Order and OrderItems are permanently visible in a separate DB session.
+    """
+    from sqlalchemy import select
+    from apps.backend.app.models import Order, OrderItem
+    from conftest import TestSessionLocal
+
+    env = sample_order_fixture
+    ctx = DummyToolContext(
+        customer_id=env["cust"].id,
+        dining_session_id=env["session"].id,
+        table_number="T-09",
+    )
+
+    # Use the real sessionmaker as the tool factory
+    set_tool_session_factory(TestSessionLocal)
+
+    # 1. Add item to draft
+    add_res = await add_item_to_order_draft(
+        menu_item="Bebek Goreng Madura",
+        quantity=2,
+        notes="pedas",
+        tool_context=ctx,
+    )
+    assert add_res["status"] == "added"
+
+    # 2. Confirm order
+    confirm_res = await confirm_and_place_order(tool_context=ctx)
+    assert confirm_res["status"] == "created"
+    order_id = confirm_res["order_id"]
+    assert order_id is not None
+
+    # 3. Query from a completely fresh and independent DB session
+    async with TestSessionLocal() as fresh_session:
+        stmt = select(Order).where(Order.id == order_id)
+        persisted_order = (await fresh_session.execute(stmt)).scalar_one_or_none()
+        assert persisted_order is not None
+        assert persisted_order.id == order_id
+        assert persisted_order.customer_id == env["cust"].id
+        assert persisted_order.dining_session_id == env["session"].id
+        assert persisted_order.table_id == env["table"].id
+        assert persisted_order.total_amount == 80000
+
+        # Check OrderItems
+        stmt_items = select(OrderItem).where(OrderItem.order_id == order_id)
+        persisted_items = (await fresh_session.execute(stmt_items)).scalars().all()
+        assert len(persisted_items) == 1
+        assert persisted_items[0].menu_item_id == env["item1"].id
+        assert persisted_items[0].quantity == 2
+        assert persisted_items[0].unit_price == 40000
+        assert persisted_items[0].subtotal == 80000
+        assert persisted_items[0].notes == "pedas"
+
+

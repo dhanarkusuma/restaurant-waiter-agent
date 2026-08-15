@@ -436,13 +436,27 @@ DONE
 
 ## DR-004 — Table Management
 
-Admin harus dapat melihat:
+Admin harus dapat mengelola layout meja restoran melalui dashboard.
+
+Admin dapat:
+
+* melihat seluruh meja dalam bentuk visual floor layout;
+* menambahkan meja;
+* mengubah nomor meja;
+* mengubah kapasitas meja;
+* melakukan drag-and-drop meja untuk mengatur posisi pada layout;
+* melihat QR code meja;
+* menonaktifkan meja;
+* melihat status meja;
+* melihat active dining session;
+* melihat customer yang sedang menggunakan meja;
+* melihat waktu order terakhir yang telah selesai.
+
+Setiap meja pada floor layout minimal menampilkan:
 
 * nomor meja;
-* status meja;
-* active dining session;
-* customer yang sedang menggunakan meja;
-* waktu order terakhir yang telah selesai.
+* kapasitas;
+* status meja.
 
 Table status minimal:
 
@@ -450,8 +464,6 @@ Table status minimal:
 AVAILABLE
 OCCUPIED
 ```
-
----
 
 ## DR-005 — Customer Memory
 

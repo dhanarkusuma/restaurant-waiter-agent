@@ -8,6 +8,16 @@ class TableNotFoundError(DomainException):
         super().__init__(message)
 
 
+class TableAlreadyExistsError(DomainException):
+    def __init__(self, message: str = "Table number already exists"):
+        super().__init__(message)
+
+
+class CannotDeactivateActiveTableError(DomainException):
+    def __init__(self, message: str = "Cannot deactivate a table with an active dining session"):
+        super().__init__(message)
+
+
 class TableAlreadyOccupiedError(DomainException):
     def __init__(self, message: str = "Table is currently occupied with an active session"):
         super().__init__(message)

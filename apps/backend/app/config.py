@@ -32,6 +32,7 @@ class Settings(BaseSettings):
 
     # Telegram Bot Integration
     TELEGRAM_BOT_TOKEN: str = ""
+    TELEGRAM_BOT_USERNAME: str = "restu_waiter_bot"
     TELEGRAM_WEBHOOK_URL: str = ""
     TELEGRAM_WEBHOOK_SECRET: str = ""
 

@@ -140,3 +140,44 @@ async def test_add_and_remove_favorite_tools(sample_customer: Customer, sample_m
 
     profile_after = await get_customer_memory(tool_context=ctx)
     assert len(profile_after["favorites"]) == 0
+
+
+@pytest.mark.asyncio
+async def test_memory_and_favorites_persistence_in_separate_db_session(
+    sample_customer: Customer,
+    sample_menu,
+):
+    """
+    Regression test ensuring save_customer_preference and add_customer_favorite
+    commit transactions so data persists across separate DB sessions.
+    """
+    from sqlalchemy import select
+    from apps.backend.app.models import CustomerMemory, CustomerFavorite
+    from conftest import TestSessionLocal
+
+    ctx = DummyToolContext(customer_id=sample_customer.id)
+
+    set_tool_session_factory(TestSessionLocal)
+
+    res_mem = await save_customer_preference(
+        memory_type="preference",
+        description="Suka kopi tanpa gula",
+        tool_context=ctx,
+    )
+    assert res_mem["status"] == "created"
+
+    res_fav = await add_customer_favorite(
+        menu_name_or_id="Rawon Surabaya",
+        tool_context=ctx,
+    )
+    assert res_fav["status"] == "added"
+
+    async with TestSessionLocal() as fresh_session:
+        mems = (await fresh_session.execute(select(CustomerMemory).where(CustomerMemory.customer_id == sample_customer.id))).scalars().all()
+        favs = (await fresh_session.execute(select(CustomerFavorite).where(CustomerFavorite.customer_id == sample_customer.id))).scalars().all()
+        assert len(mems) == 1
+        assert mems[0].description == "Suka kopi tanpa gula"
+        assert len(favs) == 1
+        assert favs[0].menu_item_id == sample_menu.id
+
+

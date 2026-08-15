@@ -3,7 +3,7 @@ from typing import Any
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agent.runner import WaiterAgentRunner, default_waiter_runner
+from agent.runner import WaiterAgentRunner, get_default_waiter_runner
 from apps.backend.app.config import settings
 from apps.backend.app.exceptions import (
     CustomerAlreadyHasActiveSessionError,
@@ -29,7 +29,7 @@ class TelegramService:
         self.customer_repo = CustomerRepository(db)
         self.table_repo = TableRepository(db)
         self.session_service = SessionService(db)
-        self.agent_runner = agent_runner or default_waiter_runner
+        self.agent_runner = agent_runner or get_default_waiter_runner()
 
     async def get_or_create_customer(
         self,

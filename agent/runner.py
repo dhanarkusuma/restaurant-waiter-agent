@@ -1,11 +1,12 @@
 import logging
+import os
 from typing import Any
 from google.adk.agents import Agent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
-from agent.agents.waiter_agent import root_agent
+from apps.backend.app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,10 @@ class WaiterAgentRunner:
         app_name: str = "restaurant_waiter_app",
         session_service: InMemorySessionService | None = None,
     ):
-        self.agent = agent or root_agent
+        if agent is None:
+            from agent.agents.waiter_agent import root_agent
+            agent = root_agent
+        self.agent = agent
         self.app_name = app_name
         self.session_service = session_service or InMemorySessionService()
         self.runner = Runner(
@@ -42,6 +46,10 @@ class WaiterAgentRunner:
         Handle a customer conversational message through the Google ADK Agent.
         Preserves trusted customer_id and dining_session_id context in session state.
         """
+        # Ensure API key from settings is accessible to google-genai client
+        if settings.GEMINI_API_KEY and "GEMINI_API_KEY" not in os.environ:
+            os.environ["GEMINI_API_KEY"] = settings.GEMINI_API_KEY
+
         user_id_str = str(customer_id)
         session_id_str = f"dining_session_{session_id}"
 
@@ -86,7 +94,11 @@ class WaiterAgentRunner:
                         if part.text:
                             response_chunks.append(part.text)
         except Exception as e:
-            logger.warning("ADK Agent runner call encountered exception: %s. Using graceful response.", e)
+            logger.warning(
+                "ADK Agent runner call encountered exception: %s. Using graceful response.",
+                e,
+                exc_info=True,
+            )
             table_info = f" di Meja {table_number}" if table_number else ""
             return (
                 f"Halo! Saya adalah AI Waiter Anda{table_info}. "
@@ -100,5 +112,17 @@ class WaiterAgentRunner:
         return f"Halo! Ada yang bisa saya bantu untuk pesanan Anda{table_info}?"
 
 
-# Default shared runner instance
-default_waiter_runner = WaiterAgentRunner()
+_default_waiter_runner: WaiterAgentRunner | None = None
+
+
+def get_default_waiter_runner() -> WaiterAgentRunner:
+    global _default_waiter_runner
+    if _default_waiter_runner is None:
+        _default_waiter_runner = WaiterAgentRunner()
+    return _default_waiter_runner
+
+
+def __getattr__(name: str) -> Any:
+    if name == "default_waiter_runner":
+        return get_default_waiter_runner()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

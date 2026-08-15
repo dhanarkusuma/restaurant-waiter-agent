@@ -18,7 +18,7 @@ from agent.tools.order_tool import (
 )
 
 
-def create_waiter_agent(model_name: str = "gemini-2.5-flash") -> Agent:
+def create_waiter_agent(model_name: str = "gemini-3.6-flash") -> Agent:
     """
     Factory function to create the Google ADK Restaurant Waiter Agent with menu, memory, and ordering tools.
     """
