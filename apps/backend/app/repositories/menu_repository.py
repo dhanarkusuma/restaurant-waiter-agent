@@ -1,8 +1,9 @@
+from typing import Any
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from apps.backend.app.models import MenuCategory, MenuItem
+from apps.backend.app.models import MenuCategory, MenuItem, OrderItem
 
 
 class MenuRepository:
@@ -26,8 +27,14 @@ class MenuRepository:
         return result.scalar_one_or_none()
 
     async def list_categories(self) -> list[MenuCategory]:
-        result = await self.session.execute(select(MenuCategory))
+        result = await self.session.execute(select(MenuCategory).order_by(MenuCategory.name))
         return list(result.scalars().all())
+
+    async def get_category_by_id(self, category_id: int) -> MenuCategory | None:
+        result = await self.session.execute(
+            select(MenuCategory).where(MenuCategory.id == category_id)
+        )
+        return result.scalar_one_or_none()
 
     async def search(
         self,
@@ -70,6 +77,14 @@ class MenuRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def list_all_admin(self, category_id: int | None = None) -> list[MenuItem]:
+        """List all menu items for admin management (including unavailable)."""
+        stmt = select(MenuItem).options(selectinload(MenuItem.category)).order_by(MenuItem.name)
+        if category_id is not None:
+            stmt = stmt.where(MenuItem.category_id == category_id)
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
     async def create_category(self, name: str, description: str | None = None) -> MenuCategory:
         category = MenuCategory(name=name, description=description)
         self.session.add(category)
@@ -93,4 +108,46 @@ class MenuRepository:
         )
         self.session.add(item)
         await self.session.flush()
-        return item
+        # Re-fetch with category loaded
+        return await self.get_by_id(item.id) or item
+
+    async def update_item(
+        self,
+        item: MenuItem,
+        name: str | None = None,
+        price: int | None = None,
+        description: str | None = None,
+        category_id: int | None = None,
+        is_available: bool | None = None,
+    ) -> MenuItem:
+        if name is not None:
+            item.name = name.strip()
+        if price is not None:
+            item.price = price
+        if description is not None:
+            item.description = description
+        if category_id is not None:
+            item.category_id = category_id
+        if is_available is not None:
+            item.is_available = is_available
+        await self.session.flush()
+        return await self.get_by_id(item.id) or item
+
+    async def delete_or_deactivate_item(self, item: MenuItem) -> str:
+        """
+        Delete if never ordered, otherwise deactivate (is_available=False)
+        to protect historical order integrity.
+        """
+        result = await self.session.execute(
+            select(OrderItem).where(OrderItem.menu_item_id == item.id).limit(1)
+        )
+        has_orders = result.scalar_one_or_none() is not None
+
+        if has_orders:
+            item.is_available = False
+            await self.session.flush()
+            return "deactivated"
+        else:
+            await self.session.delete(item)
+            await self.session.flush()
+            return "deleted"

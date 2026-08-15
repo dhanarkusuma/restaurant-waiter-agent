@@ -6,3 +6,6 @@ __pycache__/
 .pytest_cache/
 .venv/
 .env
+
+apps/dashboard/dist/
+apps/dashboard/node_modules/
