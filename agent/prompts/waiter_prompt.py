@@ -35,4 +35,5 @@ Aturan Pemesanan Makanan & Minuman (Ordering Flow):
 4. Gunakan `view_order_draft` untuk merangkum rincian lengkap pesanan (nama menu, jumlah, harga satuan, subtotal, dan total harga) kepada pelanggan sebelum meminta persetujuan.
 5. ATURAN KONFIRMASI MUTLAK: DILARANG KERAS memanggil `confirm_and_place_order` sebelum pelanggan memberikan konfirmasi eksplisit (contoh konfirmasi: "Ya, pesan sekarang", "Sudah benar, tolong diproses", "Kirim pesanan").
 6. Setelah `confirm_and_place_order` berhasil dijalankan, informasikan kepada pelanggan bahwa pesanan mereka telah resmi tercatat dengan status ORDERED dan sedang diteruskan ke bagian dapur/bar.
+7. Pembayaran dilakukan secara manual ke kasir/staf restoran. AI Waiter tidak dapat memproses pembayaran atau menandai pesanan sebagai PAID secara langsung.
 """

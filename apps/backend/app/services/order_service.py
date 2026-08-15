@@ -1,8 +1,15 @@
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.backend.app.exceptions import SessionNotFoundError, TableNotFoundError
-from apps.backend.app.models import OrderStatus, PaymentStatus, SessionStatus
+from apps.backend.app.config import settings
+from apps.backend.app.exceptions import (
+    InvalidOrderStatusTransitionError,
+    OrderNotFoundError,
+    SessionNotFoundError,
+    TableNotFoundError,
+)
+from apps.backend.app.models import Order, OrderStatus, PaymentStatus, SessionStatus
 from apps.backend.app.repositories.menu_repository import MenuRepository
 from apps.backend.app.repositories.order_repository import OrderRepository
 from apps.backend.app.repositories.session_repository import SessionRepository
@@ -33,6 +40,13 @@ _global_draft_manager = OrderDraftManager()
 
 
 class OrderService:
+    # Valid forward state transitions
+    VALID_TRANSITIONS: dict[OrderStatus, list[OrderStatus]] = {
+        OrderStatus.ORDERED: [OrderStatus.IN_PROGRESS],
+        OrderStatus.IN_PROGRESS: [OrderStatus.DONE],
+        OrderStatus.DONE: [],
+    }
+
     def __init__(
         self,
         db: AsyncSession,
@@ -207,6 +221,7 @@ class OrderService:
         self,
         customer_id: int,
         session_id: int,
+        payment_timeout_minutes: int | None = None,
     ) -> dict[str, Any]:
         """
         Confirm customer draft, persist Order and OrderItem records in PostgreSQL.
@@ -265,6 +280,7 @@ class OrderService:
             table_id=session.table_id,
             total_amount=total_amount,
             items=verified_items,
+            payment_timeout_minutes=payment_timeout_minutes,
         )
 
         # 5. Clear draft upon successful creation
@@ -279,3 +295,119 @@ class OrderService:
             "payment_status": order.payment_status.value,
             "items": verified_items,
         }
+
+    # --- Order Lifecycle (Admin / Kitchen Actions) ---
+
+    async def get_order_by_id(self, order_id: int) -> Order | None:
+        return await self.order_repo.get_by_id(order_id)
+
+    async def list_orders(
+        self,
+        status: OrderStatus | None = None,
+        payment_status: PaymentStatus | None = None,
+    ) -> list[Order]:
+        return await self.order_repo.list_all(status=status, payment_status=payment_status)
+
+    async def update_order_status(
+        self,
+        order_id: int,
+        new_status: OrderStatus,
+        completed_at: datetime | None = None,
+    ) -> Order:
+        """
+        Advance order status strictly forward:
+        ORDERED -> IN_PROGRESS -> DONE.
+        Updates dining session's last_order_completed_at when order becomes DONE.
+        """
+        order = await self.order_repo.get_by_id(order_id)
+        if not order:
+            raise OrderNotFoundError(f"Order with ID {order_id} not found")
+
+        current_status = order.status
+        allowed_targets = self.VALID_TRANSITIONS.get(current_status, [])
+
+        if new_status not in allowed_targets:
+            raise InvalidOrderStatusTransitionError(
+                f"Cannot transition order {order_id} from {current_status.value} to {new_status.value}"
+            )
+
+        order.status = new_status
+        now = completed_at or datetime.now(timezone.utc)
+
+        if new_status == OrderStatus.DONE:
+            order.completed_at = now
+            # Update dining session's last_order_completed_at anchor
+            session = await self.session_repo.get_by_id(order.dining_session_id)
+            if session:
+                session.last_order_completed_at = now
+                await self.session_repo.update(session)
+
+        await self.order_repo.update(order)
+        return order
+
+    # --- Manual Payment (Admin Action) ---
+
+    async def mark_order_as_paid(self, order_id: int) -> Order:
+        """
+        Admin marks an order as PAID manually.
+        Operation is idempotent.
+        """
+        order = await self.order_repo.get_by_id(order_id)
+        if not order:
+            raise OrderNotFoundError(f"Order with ID {order_id} not found")
+
+        if order.payment_status == PaymentStatus.PAID:
+            return order
+
+        order.payment_status = PaymentStatus.PAID
+        order.is_overdue = False  # Paid orders are no longer overdue
+        await self.order_repo.update(order)
+        return order
+
+    # --- Payment Timeout Processing ---
+
+    def is_order_overdue(
+        self,
+        order: Order,
+        current_time: datetime | None = None,
+    ) -> bool:
+        """
+        Check if an unpaid order has passed its payment_due_at timestamp.
+        """
+        if order.payment_status == PaymentStatus.PAID:
+            return False
+
+        if not order.payment_due_at:
+            return False
+
+        now = current_time or datetime.now(timezone.utc)
+        due_at = order.payment_due_at
+
+        # Match timezone awareness
+        if due_at.tzinfo is None and now.tzinfo is not None:
+            due_at = due_at.replace(tzinfo=timezone.utc)
+        elif due_at.tzinfo is not None and now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+
+        return now >= due_at
+
+    async def process_payment_timeouts(
+        self,
+        current_time: datetime | None = None,
+    ) -> list[Order]:
+        """
+        Identify unpaid orders that have passed payment_due_at and mark is_overdue = True.
+        Does NOT cancel order or mark PAID.
+        """
+        unpaid_orders = await self.order_repo.list_all(payment_status=PaymentStatus.UNPAID)
+        newly_overdue: list[Order] = []
+
+        now = current_time or datetime.now(timezone.utc)
+
+        for order in unpaid_orders:
+            if not order.is_overdue and self.is_order_overdue(order, current_time=now):
+                order.is_overdue = True
+                await self.order_repo.update(order)
+                newly_overdue.append(order)
+
+        return newly_overdue
