@@ -9,17 +9,24 @@ from agent.tools.memory_tool import (
     save_customer_preference,
 )
 from agent.tools.menu_tool import get_menu_details, search_available_menu
+from agent.tools.order_tool import (
+    add_item_to_order_draft,
+    confirm_and_place_order,
+    remove_item_from_order_draft,
+    update_draft_item_quantity,
+    view_order_draft,
+)
 
 
 def create_waiter_agent(model_name: str = "gemini-2.5-flash") -> Agent:
     """
-    Factory function to create the Google ADK Restaurant Waiter Agent with menu and memory tools.
+    Factory function to create the Google ADK Restaurant Waiter Agent with menu, memory, and ordering tools.
     """
     return Agent(
         name="restaurant_waiter",
         model=model_name,
         instruction=WAITER_SYSTEM_INSTRUCTION,
-        description="AI Waiter Agent helping restaurant customers with menu discovery, recommendations, memory personalization, and dining session",
+        description="AI Waiter Agent helping restaurant customers with menu discovery, recommendations, memory personalization, order drafting, and dining session",
         tools=[
             search_available_menu,
             get_menu_details,
@@ -28,6 +35,11 @@ def create_waiter_agent(model_name: str = "gemini-2.5-flash") -> Agent:
             forget_customer_preference,
             add_customer_favorite,
             remove_customer_favorite,
+            add_item_to_order_draft,
+            update_draft_item_quantity,
+            remove_item_from_order_draft,
+            view_order_draft,
+            confirm_and_place_order,
         ],
     )
 
