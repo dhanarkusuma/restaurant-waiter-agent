@@ -10,12 +10,16 @@ from agent.runner import WaiterAgentRunner
 
 
 def test_waiter_agent_configuration():
-    """Verify that root ADK agent is correctly configured with Waiter persona."""
+    """Verify that root ADK agent is correctly configured with Waiter persona and language guidelines."""
     agent = create_waiter_agent()
     assert isinstance(agent, Agent)
     assert agent.name == "restaurant_waiter"
     assert "AI Waiter" in agent.instruction
     assert "Pelayan Restoran" in agent.instruction
+    assert "Bahasa Indonesia adalah bahasa utama" in agent.instruction
+    assert "alami, santun, hangat, dan ringkas" in agent.instruction
+    assert "bahasa percakapan sehari-hari" in agent.instruction
+    assert "bahasa lain" in agent.instruction
     assert agent.description == "AI Waiter Agent helping restaurant customers with their dining session"
     assert root_agent.name == "restaurant_waiter"
 
