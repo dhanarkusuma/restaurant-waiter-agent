@@ -91,7 +91,7 @@ class SessionService:
         await self.session_repo.update(dining_session)
 
         # Release table back to AVAILABLE
-        table = dining_session.table or await self.table_repo.get_by_id(dining_session.table_id)
+        table = await self.table_repo.get_by_id(dining_session.table_id)
         if table:
             await self.table_repo.update_status(table, TableStatus.AVAILABLE)
 

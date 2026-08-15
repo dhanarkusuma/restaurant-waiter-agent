@@ -21,16 +21,21 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
 
+    # Admin Seeder Credentials (loaded from .env or environment)
+    ADMIN_USERNAME: str = ""
+    ADMIN_PASSWORD: str = ""
+    ADMIN_FULL_NAME: str = "System Administrator"
+
     # Timeouts (as per approved spec)
     SESSION_AUTO_TERMINATE_MINUTES: int = 30
     PAYMENT_TIMEOUT_MINUTES: int = 10
 
-    # Telegram Bot Integration (placeholder for later phases)
+    # Telegram Bot Integration
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_WEBHOOK_URL: str = ""
     TELEGRAM_WEBHOOK_SECRET: str = ""
 
-    # Google AI / Gemini API (placeholder for later phases)
+    # Google AI / Gemini API
     GEMINI_API_KEY: str = ""
     GOOGLE_GENAI_USE_VERTEXAI: bool = False
 

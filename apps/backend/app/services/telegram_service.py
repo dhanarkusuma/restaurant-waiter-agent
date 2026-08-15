@@ -96,7 +96,7 @@ class TelegramService:
                 # /start without QR deep-link token
                 active_session = await self.session_service.get_active_session_for_customer(customer.id)
                 if active_session:
-                    table = active_session.table or await self.table_repo.get_by_id(active_session.table_id)
+                    table = await self.table_repo.get_by_id(active_session.table_id)
                     table_name = table.table_number if table else f"#{active_session.table_id}"
                     response_text = (
                         f"Selamat datang kembali! Anda saat ini terhubung dengan Meja {table_name}. "
@@ -116,7 +116,7 @@ class TelegramService:
         else:
             active_session = await self.session_service.get_active_session_for_customer(customer.id)
             if active_session:
-                table = active_session.table or await self.table_repo.get_by_id(active_session.table_id)
+                table = await self.table_repo.get_by_id(active_session.table_id)
                 table_name = table.table_number if table else f"#{active_session.table_id}"
                 response_text = await self.agent_runner.handle_customer_message(
                     customer_id=customer.id,
@@ -139,7 +139,7 @@ class TelegramService:
                 customer_id=customer.id,
                 qr_code_token=qr_token,
             )
-            table = session.table or await self.table_repo.get_by_id(session.table_id)
+            table = await self.table_repo.get_by_id(session.table_id)
             table_name = table.table_number if table else f"#{session.table_id}"
             return (
                 f"Selamat datang di Restoran! Anda berhasil terhubung dengan Meja {table_name}. "
@@ -158,7 +158,7 @@ class TelegramService:
         if not active_session:
             return "Anda tidak memiliki sesi makan yang aktif saat ini."
 
-        table = active_session.table or await self.table_repo.get_by_id(active_session.table_id)
+        table = await self.table_repo.get_by_id(active_session.table_id)
         table_name = table.table_number if table else f"#{active_session.table_id}"
 
         await self.session_service.complete_session(active_session.id)

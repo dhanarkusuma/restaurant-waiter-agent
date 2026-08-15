@@ -10,7 +10,7 @@ from apps.backend.app.models import (
     SessionStatus,
     TableStatus,
 )
-from apps.backend.app.repositories import CustomerRepository, TableRepository
+from apps.backend.app.repositories import CustomerRepository, SessionRepository, TableRepository
 from apps.backend.app.schemas.telegram import (
     TelegramChat,
     TelegramMessage,
@@ -63,153 +63,216 @@ def make_telegram_update(
 
 
 @pytest.mark.asyncio
-async def test_telegram_customer_creation_and_retrieval(
+async def test_customer_creation_from_telegram_identity(
     telegram_service: TelegramService,
     db_session: AsyncSession,
 ):
-    """Test that customer record is created or retrieved based on Telegram user ID."""
-    # First update creates the customer
-    customer1 = await telegram_service.get_or_create_customer(
-        telegram_id=99887766,
-        username="telegram_user_1",
-        first_name="User",
-        last_name="One",
+    """Test that customer record is created on first interaction."""
+    update = make_telegram_update(
+        telegram_id=123456789,
+        username="test_user",
+        first_name="Alice",
+        text="/start",
     )
-    assert customer1.id is not None
-    assert customer1.telegram_id == 99887766
-    assert customer1.username == "telegram_user_1"
 
-    # Second call returns the exact same customer record
-    customer2 = await telegram_service.get_or_create_customer(
-        telegram_id=99887766,
-    )
-    assert customer1.id == customer2.id
+    response = await telegram_service.process_update(update)
+    assert response is not None
+    assert response.chat_id == 123456789
+    assert "Silakan scan QR code" in response.text
+
+    # Verify customer in DB
+    customer_repo = CustomerRepository(db_session)
+    customer = await customer_repo.get_by_telegram_id(123456789)
+    assert customer is not None
+    assert customer.username == "test_user"
+    assert customer.first_name == "Alice"
 
 
 @pytest.mark.asyncio
-async def test_valid_table_deep_link_flow(
+async def test_customer_retrieval_existing_telegram_identity(
+    telegram_service: TelegramService,
+    db_session: AsyncSession,
+):
+    """Test retrieving existing customer without duplicate record creation."""
+    customer_repo = CustomerRepository(db_session)
+    created = await customer_repo.create(
+        telegram_id=987654321,
+        username="existing_user",
+        first_name="Bob",
+    )
+
+    update = make_telegram_update(
+        telegram_id=987654321,
+        username="existing_user",
+        text="/start",
+    )
+    await telegram_service.process_update(update)
+
+    fetched = await customer_repo.get_by_telegram_id(987654321)
+    assert fetched.id == created.id
+
+
+@pytest.mark.asyncio
+async def test_deep_link_qr_table_reservation(
     telegram_service: TelegramService,
     test_table_1: RestaurantTable,
     db_session: AsyncSession,
 ):
-    """Test that /start <token> creates an active session and reserves the table."""
+    """Test /start <qr_token> successfully reserves an available table."""
     update = make_telegram_update(
-        telegram_id=12345,
+        telegram_id=111222,
         text=f"/start {test_table_1.qr_code_token}",
     )
 
     response = await telegram_service.process_update(update)
     assert response is not None
-    assert response.chat_id == 12345
     assert "berhasil terhubung dengan Meja T-01" in response.text
-    assert test_table_1.status == TableStatus.OCCUPIED
+    assert "Sesi makan Anda telah aktif" in response.text
+
+    # Verify table is now OCCUPIED
+    table_repo = TableRepository(db_session)
+    table = await table_repo.get_by_id(test_table_1.id)
+    assert table.status == TableStatus.OCCUPIED
 
 
 @pytest.mark.asyncio
-async def test_invalid_table_token_flow(
+async def test_deep_link_invalid_qr_token(
     telegram_service: TelegramService,
 ):
-    """Test /start with non-existent QR token returns error message."""
+    """Test /start <invalid_token> returns error message."""
     update = make_telegram_update(
-        telegram_id=12345,
-        text="/start non_existent_table_token",
+        telegram_id=333444,
+        text="/start invalid_nonexistent_qr",
     )
 
     response = await telegram_service.process_update(update)
     assert response is not None
-    assert "kode QR meja tidak valid" in response.text
+    assert "tidak valid atau tidak terdaftar" in response.text
 
 
 @pytest.mark.asyncio
-async def test_occupied_table_telegram_flow(
+async def test_deep_link_occupied_table(
     telegram_service: TelegramService,
     test_table_1: RestaurantTable,
+    db_session: AsyncSession,
 ):
-    """Test that customer 2 scanning an occupied table gets an occupied notification."""
-    # Customer 1 reserves Table 1
+    """Test /start on already occupied table is rejected."""
+    # User 1 reserves table 1
     update1 = make_telegram_update(
-        telegram_id=111,
+        telegram_id=101010,
         text=f"/start {test_table_1.qr_code_token}",
     )
     await telegram_service.process_update(update1)
 
-    # Customer 2 attempts to scan Table 1
+    # User 2 tries to reserve same table 1
     update2 = make_telegram_update(
-        telegram_id=222,
+        telegram_id=202020,
         text=f"/start {test_table_1.qr_code_token}",
     )
     response2 = await telegram_service.process_update(update2)
-
     assert response2 is not None
     assert "sedang digunakan oleh pelanggan lain" in response2.text
 
 
 @pytest.mark.asyncio
-async def test_customer_already_having_another_active_session(
+async def test_user_already_has_active_session_on_other_table(
     telegram_service: TelegramService,
     test_table_1: RestaurantTable,
     test_table_2: RestaurantTable,
 ):
-    """Test that customer scanning table 2 while having active session on table 1 gets warning."""
-    # Customer reserves Table 1
+    """Test that customer cannot reserve a second table while first session is active."""
+    # Reserve Table 1
     update1 = make_telegram_update(
-        telegram_id=333,
+        telegram_id=555666,
         text=f"/start {test_table_1.qr_code_token}",
     )
     await telegram_service.process_update(update1)
 
-    # Same customer scans Table 2
+    # Try to reserve Table 2
     update2 = make_telegram_update(
-        telegram_id=333,
+        telegram_id=555666,
         text=f"/start {test_table_2.qr_code_token}",
     )
     response2 = await telegram_service.process_update(update2)
-
     assert response2 is not None
     assert "masih memiliki sesi makan aktif di meja lain" in response2.text
 
 
 @pytest.mark.asyncio
-async def test_same_customer_rescanning_same_table(
+async def test_re_entering_same_table_deep_link_resumes_session(
     telegram_service: TelegramService,
     test_table_1: RestaurantTable,
 ):
-    """Test idempotent re-scan of the same table returns friendly active session message."""
+    """Test that scanning same table QR when customer is already at that table resumes session."""
     update = make_telegram_update(
-        telegram_id=444,
+        telegram_id=777888,
         text=f"/start {test_table_1.qr_code_token}",
     )
-    # First scan
-    resp1 = await telegram_service.process_update(update)
-    assert "berhasil terhubung dengan Meja T-01" in resp1.text
+    # First entry
+    res1 = await telegram_service.process_update(update)
+    assert "berhasil terhubung dengan Meja T-01" in res1.text
 
-    # Re-scan same table
-    resp2 = await telegram_service.process_update(update)
-    assert "berhasil terhubung dengan Meja T-01" in resp2.text
+    # Re-scan same QR
+    res2 = await telegram_service.process_update(update)
+    assert "berhasil terhubung dengan Meja T-01" in res2.text
 
 
 @pytest.mark.asyncio
-async def test_done_command_session_completion(
+async def test_start_without_token_when_session_active(
     telegram_service: TelegramService,
     test_table_1: RestaurantTable,
 ):
-    """Test /done command completes active session and releases table."""
-    # Start session
-    update_start = make_telegram_update(
-        telegram_id=555,
-        text=f"/start {test_table_1.qr_code_token}",
+    """Test /start without token when session is already active informs user of their table."""
+    # First reserve
+    await telegram_service.process_update(
+        make_telegram_update(telegram_id=999111, text=f"/start {test_table_1.qr_code_token}")
     )
-    await telegram_service.process_update(update_start)
-    assert test_table_1.status == TableStatus.OCCUPIED
 
-    # Send /done
-    update_done = make_telegram_update(
-        telegram_id=555,
-        text="/done",
+    # Now send plain /start
+    res = await telegram_service.process_update(
+        make_telegram_update(telegram_id=999111, text="/start")
     )
-    resp_done = await telegram_service.process_update(update_done)
-    assert "telah selesai" in resp_done.text
-    assert test_table_1.status == TableStatus.AVAILABLE
+    assert res is not None
+    assert "Selamat datang kembali" in res.text
+    assert "Meja T-01" in res.text
+
+
+@pytest.mark.asyncio
+async def test_done_command_completes_session_and_releases_table(
+    telegram_service: TelegramService,
+    test_table_1: RestaurantTable,
+    db_session: AsyncSession,
+):
+    """Test /done completes active session and marks table AVAILABLE."""
+    # Reserve
+    await telegram_service.process_update(
+        make_telegram_update(telegram_id=444555, text=f"/start {test_table_1.qr_code_token}")
+    )
+
+    # Terminate
+    res = await telegram_service.process_update(
+        make_telegram_update(telegram_id=444555, text="/done")
+    )
+    assert res is not None
+    assert "telah selesai" in res.text
+    assert "Meja telah dikosongkan" in res.text
+
+    # Verify table AVAILABLE
+    table_repo = TableRepository(db_session)
+    table = await table_repo.get_by_id(test_table_1.id)
+    assert table.status == TableStatus.AVAILABLE
+
+
+@pytest.mark.asyncio
+async def test_done_command_without_active_session(
+    telegram_service: TelegramService,
+):
+    """Test /done when user has no active session."""
+    res = await telegram_service.process_update(
+        make_telegram_update(telegram_id=121212, text="/done")
+    )
+    assert res is not None
+    assert "tidak memiliki sesi makan yang aktif" in res.text
 
 
 @pytest.mark.asyncio
@@ -281,6 +344,47 @@ async def test_webhook_secret_token_verification(
         headers={"X-Telegram-Bot-Api-Secret-Token": "super_secret_token_123"},
     )
     assert res_valid.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_no_missing_greenlet_on_lazy_relationship_access(
+    telegram_service: TelegramService,
+    db_session: AsyncSession,
+    test_table_1: RestaurantTable,
+):
+    """
+    Regression test for MissingGreenlet error:
+    Ensure that processing incoming messages for a session with un-loaded table relationship
+    uses TableRepository explicitly rather than lazy-loading `session.table`.
+    """
+    cust_repo = CustomerRepository(db_session)
+    session_repo = SessionRepository(db_session)
+
+    # 1. Create customer and active session directly without loaded table relationship
+    cust = await cust_repo.create(telegram_id=999888777, username="greenlet_test_user")
+    session = await session_repo.create(customer_id=cust.id, table_id=test_table_1.id)
+    # Expire session instance so relationships are not loaded
+    db_session.expire(session)
+
+    # 2. Plain /start with active session (previously triggered lazy loading)
+    res_start = await telegram_service.process_update(
+        make_telegram_update(telegram_id=999888777, text="/start")
+    )
+    assert res_start is not None
+    assert "Meja T-01" in res_start.text
+
+    # 3. Conversational message with active session
+    res_msg = await telegram_service.process_update(
+        make_telegram_update(telegram_id=999888777, text="Halo apa kabar?")
+    )
+    assert res_msg is not None
+
+    # 4. /done with active session
+    res_done = await telegram_service.process_update(
+        make_telegram_update(telegram_id=999888777, text="/done")
+    )
+    assert res_done is not None
+    assert "Meja T-01" in res_done.text
 
 
 def test_telegram_configuration_not_hardcoded():

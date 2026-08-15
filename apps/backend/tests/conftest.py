@@ -2,6 +2,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from apps.backend.app.config import settings
 from apps.backend.app.database import Base, get_db
 from apps.backend.app.main import app
 
@@ -23,9 +24,12 @@ def anyio_backend():
 
 @pytest.fixture(autouse=True)
 async def setup_test_db():
+    orig_secret = settings.TELEGRAM_WEBHOOK_SECRET
+    settings.TELEGRAM_WEBHOOK_SECRET = ""
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
+    settings.TELEGRAM_WEBHOOK_SECRET = orig_secret
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
